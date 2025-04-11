@@ -1,4 +1,4 @@
-from config import dimension_range, num_clusters, radius_range, seed
+from config import dimension_range, num_clusters, radius_range
 import numpy as np
 import logging
 
