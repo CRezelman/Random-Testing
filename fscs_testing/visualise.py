@@ -1,72 +1,112 @@
-import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import tkinter as tk
+from tkinter import ttk
 
-def plot_results(random_inputs, random_results, fscs_inputs, fscs_results, clusters):
-    def plot_3d(ax, inputs, results, title):
-        passes = inputs[results == 'pass']
-        fails = inputs[results == 'fail']
+def plot_results(result_sets, clusters):
+    root = tk.Tk()
+    root.title("Test Results Visualisation")
 
-        ax.scatter(passes[:, 0], passes[:, 1], passes[:, 2], c='green', label='Pass', alpha=0.4)
-        ax.scatter(fails[:, 0], fails[:, 1], fails[:, 2], c='red', label='Fail', alpha=0.8)
+    datasets = {
+        name: (inputs, results, tk.BooleanVar(value=True, master=root))
+        for name, (inputs, results) in result_sets.items()
+    }
 
-        for cluster in clusters:
-            cx, cy, cz = cluster['center']
-            ax.text(cx, cy, cz, "Fail Zone", color='red')
+    colours = [
+        "blue", "orange", "purple", "green", "red", "cyan", "magenta", "yellow"
+    ]
+    markers = ['o', 'x', '^', 's', 'D', 'p', '*']
 
-        ax.set_title(f"{title} - 3D")
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.set_zlabel("Z")
-        ax.legend()
+    def create_figure():
+        return Figure(figsize=(7, 6), dpi=100)
 
-    def plot_2d(ax, inputs, results, title, idx1, idx2, labels):
-        passes = inputs[results == 'pass']
-        fails = inputs[results == 'fail']
+    def draw_plot(axs, is_3d):
+        for ax in axs:
+            ax.clear()
 
-        ax.scatter(passes[:, idx1], passes[:, idx2], c='green', label='Pass', alpha=0.4)
-        ax.scatter(fails[:, idx1], fails[:, idx2], c='red', label='Fail', alpha=0.8)
+        for idx, (name, (inputs, results, var)) in enumerate(datasets.items()):
+            if not var.get():
+                continue
 
-        for cluster in clusters:
-            coord = cluster['center']
-            ax.text(coord[idx1], coord[idx2], "Fail Zone", color='red')
+            passes = inputs[results == 'pass']
+            fails = inputs[results == 'fail']
 
-        ax.set_title(f"{title} - {labels[0]}{labels[1]} Plane")
-        ax.set_xlabel(labels[0])
-        ax.set_ylabel(labels[1])
-        ax.legend()
+            colour = colours[idx % len(colours)]
+            pass_marker = markers[0]
+            fail_marker = markers[1]
 
-    # --- First GUI: 3D Plots ---
-    fig_3d = plt.figure(figsize=(14, 6))
-    ax1 = fig_3d.add_subplot(121, projection='3d')
-    plot_3d(ax1, random_inputs, random_results, "Random Testing")
+            if is_3d:
+                axs[0].scatter(passes[:, 0], passes[:, 1], passes[:, 2], label=f"{name} Pass", 
+                               color=colour, marker=pass_marker, alpha=0.3)
+                axs[0].scatter(fails[:, 0], fails[:, 1], fails[:, 2], label=f"{name} Fail", 
+                               color=colour, marker=fail_marker, alpha=0.8)
+                for cluster in clusters:
+                    cx, cy, cz = cluster['center']
+                    axs[0].text(cx, cy, cz, "Fail Zone", color='red')
+            else:
+                axs[0].scatter(passes[:, 0], passes[:, 1], label=f"{name} Pass", 
+                               color=colour, marker=pass_marker, alpha=0.3)
+                axs[0].scatter(fails[:, 0], fails[:, 1], label=f"{name} Fail", 
+                               color=colour, marker=fail_marker, alpha=0.8)
 
-    ax2 = fig_3d.add_subplot(122, projection='3d')
-    plot_3d(ax2, fscs_inputs, fscs_results, "FSCS-ART Testing")
+                axs[1].scatter(passes[:, 0], passes[:, 2], label=f"{name} Pass", 
+                               color=colour, marker=pass_marker, alpha=0.3)
+                axs[1].scatter(fails[:, 0], fails[:, 2], label=f"{name} Fail", 
+                               color=colour, marker=fail_marker, alpha=0.8)
 
-    fig_3d.tight_layout()
-    fig_3d.canvas.manager.set_window_title('3D Visualisation')
+                axs[2].scatter(passes[:, 1], passes[:, 2], label=f"{name} Pass", 
+                               color=colour, marker=pass_marker, alpha=0.3)
+                axs[2].scatter(fails[:, 1], fails[:, 2], label=f"{name} Fail", 
+                               color=colour, marker=fail_marker, alpha=0.8)
 
-    # --- Second GUI: 2D Projections ---
-    fig_2d = plt.figure(figsize=(14, 12))
-    ax3 = fig_2d.add_subplot(321)
-    plot_2d(ax3, random_inputs, random_results, "Random", 0, 1, ('X', 'Y'))
+                for cluster in clusters:
+                    cx, cy, cz = cluster['center']
+                    axs[0].text(cx, cy, "Fail Zone", color='red')
+                    axs[1].text(cx, cz, "Fail Zone", color='red')
+                    axs[2].text(cy, cz, "Fail Zone", color='red')
 
-    ax4 = fig_2d.add_subplot(322)
-    plot_2d(ax4, fscs_inputs, fscs_results, "FSCS-ART", 0, 1, ('X', 'Y'))
+        titles = ["3D View"] if is_3d else ["XY Plane", "XZ Plane", "YZ Plane"]
+        for ax, title in zip(axs, titles):
+            ax.set_title(title)
+            ax.legend()
 
-    ax5 = fig_2d.add_subplot(323)
-    plot_2d(ax5, random_inputs, random_results, "Random", 0, 2, ('X', 'Z'))
+    def create_3d_tab(parent):
+        fig = create_figure()
+        ax = fig.add_subplot(111, projection='3d')
+        canvas = FigureCanvasTkAgg(fig, master=parent)
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        draw_plot([ax], True)
+        return canvas, fig, [ax]
 
-    ax6 = fig_2d.add_subplot(324)
-    plot_2d(ax6, fscs_inputs, fscs_results, "FSCS-ART", 0, 2, ('X', 'Z'))
+    def create_2d_tab(parent):
+        fig = create_figure()
+        axs = [fig.add_subplot(311), fig.add_subplot(312), fig.add_subplot(313)]
+        canvas = FigureCanvasTkAgg(fig, master=parent)
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        draw_plot(axs, False)
+        return canvas, fig, axs
 
-    ax7 = fig_2d.add_subplot(325)
-    plot_2d(ax7, random_inputs, random_results, "Random", 1, 2, ('Y', 'Z'))
+    def update_all():
+        draw_plot(three_d_axs, True)
+        three_d_canvas.draw()
+        draw_plot(two_d_axs, False)
+        two_d_canvas.draw()
 
-    ax8 = fig_2d.add_subplot(326)
-    plot_2d(ax8, fscs_inputs, fscs_results, "FSCS-ART", 1, 2, ('Y', 'Z'))
+    tab_control = ttk.Notebook(root)
+    tab_3d = ttk.Frame(tab_control)
+    tab_2d = ttk.Frame(tab_control)
+    tab_control.add(tab_3d, text='3D View')
+    tab_control.add(tab_2d, text='2D Views')
+    tab_control.pack(expand=1, fill="both")
 
-    fig_2d.tight_layout()
-    fig_2d.canvas.manager.set_window_title('2D Plane Projections')
+    three_d_canvas, three_d_fig, three_d_axs = create_3d_tab(tab_3d)
+    two_d_canvas, two_d_fig, two_d_axs = create_2d_tab(tab_2d)
 
-    # Show both windows
-    plt.show()
+    control_frame = ttk.Frame(root)
+    control_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5)
+    ttk.Label(control_frame, text="Toggle Test Sets").pack(anchor=tk.W)
+    for name, (_, _, var) in datasets.items():
+        cb = ttk.Checkbutton(control_frame, text=name, variable=var, command=update_all)
+        cb.pack(anchor=tk.W)
+
+    root.mainloop()
